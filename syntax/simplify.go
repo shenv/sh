@@ -162,13 +162,25 @@ func (s *simplifier) inlineSimpleParams(x ArithmExpr) ArithmExpr {
 		return x
 	}
 	if pe.Excl || pe.Length || pe.Width || pe.Slice != nil ||
-		pe.Repl != nil || pe.Exp != nil || pe.Index != nil {
+		pe.Repl != nil || pe.Exp != nil {
 		// A complex parameter expansion can't be simplified.
-		//
-		// Note that index expressions can't generally be simplified
-		// either. It's fine to turn ${a[0]} into a[0], but others like
-		// a[*] are invalid in many shells including Bash.
 		return x
+	}
+	if pe.Index != nil {
+		// All index expressions can't be simplified either.
+		// It's fine to turn ${a[0]} into a[0], but others like
+		// a[*] or a[@] are invalid in many shells including Bash.
+		ww, _ := pe.Index.(*Word)
+		if ww == nil || len(ww.Parts) != 1 {
+			return x
+		}
+		l, _ := ww.Parts[0].(*Lit)
+		if l == nil || l.Value == "*" || l.Value == "@" {
+			return x
+		}
+		s.modified = true
+		pe.Short = true
+		return w
 	}
 	s.modified = true
 	return &Word{Parts: []WordPart{pe.Param}}
